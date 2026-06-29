@@ -286,5 +286,655 @@ The greedy action is selected **75% of the time**.
 ---
 
 # The 10-armed Testbed
+## Test Setup
+- **2000** randomly generated **10-armed bandit** problems.
+- **k = 10** actions.
+- True action values:
+  \[
+  q^*(a) \sim \mathcal{N}(0,1)
+  \]
+- Reward when action \(A_t\) is selected:
+  \[
+  R_t \sim \mathcal{N}(q^*(A_t),1)
+  \]
+- Each experiment:
+  - **1000 time steps**
+  - Averaged over **2000 runs**
+- Action-value estimates updated using **Sample Average Method**.
+
+---
+
+# Methods Compared
+- **Greedy (\(\epsilon=0\))**
+- **\(\epsilon\)-Greedy (\(\epsilon=0.01\))**
+- **\(\epsilon\)-Greedy (\(\epsilon=0.1\))**
+
+---
+
+# Results
+
+### Greedy
+✅ Learns quickly initially.
+
+❌ Major problem:
+- Can get stuck with a **suboptimal action**.
+- If the first few rewards from the optimal action are unlucky, it may **never explore it again**.
+- Found the optimal action in only **~1/3 of tasks**.
+
+---
+
+### ε-Greedy
+
+Continues exploring.
+
+Advantages:
+- Eventually identifies the optimal action.
+- Better long-term average reward.
+
+#### ε = 0.1
+- Explores more.
+- Finds optimal action faster.
+- But keeps exploring forever.
+- Selects optimal action only about **91%** of the time.
+
+#### ε = 0.01
+- Explores less.
+- Learns more slowly.
+- Better long-term performance than ε = 0.1.
+
+---
+
+# Choosing ε
+
+Large ε
+- More exploration
+- Faster discovery
+- Lower final reward (because exploration never stops)
+
+Small ε
+- Less exploration
+- Slower learning
+- Better final performance
+
+👉 Common idea:
+- **Decay ε over time**
+  - High initially
+  - Small later
+
+---
+
+# Effect of Reward Variance
+
+### High variance (noisy rewards)
+- Need more exploration.
+- ε-greedy performs much better than greedy.
+
+### Zero variance (deterministic rewards)
+- One sample reveals the true value.
+- Greedy may perform best after trying each action once.
+
+---
+
+# Nonstationary Problems
+
+If action values change over time:
+- Exploration is always necessary.
+- Even deterministic environments require exploration.
+- Reinforcement Learning commonly deals with **nonstationary** settings.
+
+---
+
+# Key Takeaways
+
+- **Greedy = Exploitation only**
+- **ε-Greedy = Exploration + Exploitation**
+- Exploration avoids getting trapped in poor actions.
+- Small ε → Better long-term reward.
+- Large ε → Faster learning.
+- Decaying ε often gives the best balance.
+
+# Incremental Implementation of Action-Value Estimation (Quick Revision)
+
+## Problem with Sample Average
+
+Estimated action value after selecting an action $n-1$ times:
+
+$$
+Q_n=\frac{R_1+R_2+\cdots+R_{n-1}}{n-1}
+$$
+
+### Drawback
+- Need to store **all previous rewards**.
+- Memory increases over time.
+- Computation increases because the average must be recomputed every time.
+
+---
+
+# Incremental Update
+
+Instead of storing every reward, update the estimate using only:
+- Current estimate $Q_n$
+- New reward $R_n$
+
+Update equation:
+
+$$
+Q_{n+1}=Q_n+\frac{1}{n}(R_n-Q_n)
+$$
+
+This is called the **Incremental Sample Average Update**.
+
+---
+
+# Interpretation
+
+$$
+Q_{n+1}=Q_n+\frac{1}{n}(R_n-Q_n)
+$$
+
+where
+
+- $Q_n$ = Old estimate
+- $R_n$ = New reward (**Target**)
+- $R_n-Q_n$ = Prediction (Estimation) Error
+- $\frac{1}{n}$ = Step size
+
+---
+
+# General Reinforcement Learning Update Rule
+
+Almost every RL algorithm follows this form:
+
+$$
+\boxed{
+\text{New Estimate}
+=
+\text{Old Estimate}
++
+\alpha(\text{Target}-\text{Old Estimate})
+}
+$$
+
+where
+
+- **Old Estimate** → Current value estimate
+- **Target** → Desired value
+- **Target − Old Estimate** → Error
+- $\alpha$ (alpha) → Learning rate (step size)
+
+---
+
+# Step Size (Learning Rate)
+
+For the sample-average method,
+
+$$
+\alpha=\frac{1}{n}
+$$
+
+Characteristics:
+- Large initially
+- Decreases as more samples are collected
+- Eventually becomes very small
+
+---
+
+# Why Incremental Method?
+
+✅ Constant memory: $O(1)$
+
+✅ Constant computation: $O(1)$
+
+✅ No need to store previous rewards
+
+---
+
+# ε-Greedy Bandit Algorithm
+
+Repeat:
+
+1. Choose action using **ε-greedy**
+   - Probability $\epsilon$ → Explore (random action)
+   - Probability $1-\epsilon$ → Exploit (best estimated action)
+
+2. Receive reward $R$
+
+3. Update estimate:
+
+$$
+Q(a)\leftarrow Q(a)+\frac{1}{N(a)}(R-Q(a))
+$$
+
+where
+
+- $N(a)$ = Number of times action $a$ has been selected.
+
+---
+
+# Key Formulae to Memorize
+
+### Sample Average
+
+$$
+Q_n=\frac{\sum_{i=1}^{n}R_i}{n}
+$$
+
+### Incremental Update
+
+$$
+Q_{n+1}=Q_n+\frac{1}{n}(R_n-Q_n)
+$$
+
+### General RL Update
+
+$$
+\boxed{
+\text{New}
+=
+\text{Old}
++
+\alpha(\text{Target}-\text{Old})
+}
+$$
+
+---
+
+# Intuition
+
+Every new reward **nudges** the estimate toward the true value.
+
+- Large error → Bigger update.
+- Small error → Smaller update.
+- As more samples are collected, updates become smaller because
+
+$$
+\alpha=\frac{1}{n}.
+$$
+
+---
+# Nonstationary Bandits & Constant Step Size 
+
+## Stationary vs Nonstationary
+
+### Stationary Bandit
+- True action values **do not change** over time.
+- Sample-average method works well.
+
+### Nonstationary Bandit
+- True action values **change over time**.
+- Recent rewards are more informative than old rewards.
+- Use a **constant step size** instead of sample average.
+
+---
+
+# Constant Step-Size Update Rule
+
+Instead of
+
+$$
+Q_{n+1}=Q_n+\frac{1}{n}(R_n-Q_n),
+$$
+
+use
+
+$$
+Q_{n+1}=Q_n+\alpha(R_n-Q_n),
+$$
+
+where
+
+$$
+0<\alpha\le1.
+$$
+
+- $\alpha$ is **constant**.
+- Gives more importance to **recent rewards**.
+
+---
+
+# Expanded Form
+
+Expanding recursively,
+
+$$
+Q_{n+1}
+=
+(1-\alpha)^nQ_1
++
+\sum_{i=1}^{n}
+\alpha(1-\alpha)^{n-i}R_i.
+$$
+
+This shows that:
+
+- Initial estimate $Q_1$ still contributes.
+- Every previous reward contributes.
+- **Recent rewards receive larger weights.**
+
+---
+
+# Exponential Recency-Weighted Average
+
+Weight assigned to reward $R_i$:
+
+$$
+\boxed{
+\alpha(1-\alpha)^{\,n-i}
+}
+$$
+
+Properties:
+
+- Most recent reward → Largest weight
+- Older rewards → Smaller weight
+- Weights decrease **exponentially**
+
+Hence,
+
+> **Constant step-size update is called an Exponential Recency-Weighted Average.**
+
+---
+
+# Effect of α
+
+### Large α
+
+- Learns quickly
+- Adapts rapidly to changes
+- Higher variance (more noisy)
+
+### Small α
+
+- Learns slowly
+- Smoother estimates
+- Less responsive to changes
+
+---
+
+# Variable Step Size
+
+Instead of a constant $\alpha$, use
+
+$$
+\alpha_n(a)
+$$
+
+which changes after every selection of action $a$.
+
+Example:
+
+$$
+\alpha_n(a)=\frac{1}{n}
+$$
+
+This is the **Sample Average Method**.
+
+---
+
+# Convergence Conditions
+
+For estimates to converge (with probability 1),
+
+$$
+\sum_{n=1}^{\infty}\alpha_n(a)=\infty
+$$
+
+and
+
+$$
+\sum_{n=1}^{\infty}\alpha_n^2(a)<\infty.
+$$
+
+---
+
+# Meaning of the Conditions
+
+### First Condition
+
+$$
+\sum \alpha_n=\infty
+$$
+
+- Steps never become **too small**.
+- Eventually overcomes poor initialization and random fluctuations.
+
+---
+
+### Second Condition
+
+$$
+\sum \alpha_n^2<\infty
+$$
+
+- Steps eventually become **small enough**.
+- Prevents oscillations.
+- Ensures convergence.
+
+---
+
+# Sample Average vs Constant α
+
+| Sample Average ($\alpha=\frac{1}{n}$) | Constant Step Size ($\alpha$) |
+|----------------------------------------|-------------------------------|
+| Stationary environments | Nonstationary environments |
+| Equal weight to all rewards | More weight to recent rewards |
+| Converges to true value | Does not fully converge |
+| Slow adaptation | Fast adaptation |
+| Meets convergence conditions | Does **not** satisfy second convergence condition |
+
+---
+
+# Why Doesn't Constant α Converge?
+
+Since
+
+$$
+\alpha_n=\alpha,
+$$
+
+we get
+
+$$
+\sum \alpha^2=\infty.
+$$
+
+Therefore,
+
+- Estimates never settle to a fixed value.
+- They continue adapting to new rewards.
+
+This is **desirable** when the environment keeps changing.
+
+---
+
+# Key Formulae to Memorize
+
+### Sample Average
+
+$$
+Q_{n+1}
+=
+Q_n+\frac{1}{n}(R_n-Q_n)
+$$
+
+### Constant Step Size
+
+$$
+Q_{n+1}
+=
+Q_n+\alpha(R_n-Q_n)
+$$
+
+### Expanded Form
+
+$$
+Q_{n+1}
+=
+(1-\alpha)^nQ_1
++
+\sum_{i=1}^{n}
+\alpha(1-\alpha)^{n-i}R_i
+$$
+
+### Convergence Conditions
+
+$$
+\sum\alpha_n=\infty
+$$
+
+$$
+\sum\alpha_n^2<\infty
+$$
+
+---
+
+# Intuition
+
+- **Sample Average** remembers the **entire history** equally.
+- **Constant $\alpha$** gradually **forgets the past**.
+- Forgetting is useful when the environment changes over time.
+
+---
+
+# The Problem with Initial Conditions
+
+Some exploration methods encourage exploration **only at the beginning** of learning. Two common examples are:
+
+* **Optimistic Initial Values**
+* **Sample-Average Estimates**
+
+These methods treat the **beginning of learning** as a special event.
+
+---
+
+## Optimistic Initial Values
+
+The agent starts with artificially high estimates of action values.
+
+Example:
+
+```text
+True Action Values
+
+Action A : 5
+Action B : 8
+Action C : 3
+
+Initial Estimates
+
+Q(A) = 100
+Q(B) = 100
+Q(C) = 100
+```
+
+Since all actions initially appear highly rewarding, the agent naturally explores each one.
+
+However, after sufficient interactions, these optimistic estimates are replaced by actual reward estimates, and the exploration incentive disappears.
+
+---
+
+## Sample-Average Method
+
+The sample-average update rule is
+
+$$
+Q_{n+1} = Q_n + \frac{1}{n}(R_n - Q_n)
+$$
+
+Every observed reward contributes **equally** to the final estimate.
+
+As more rewards are collected:
+
+* The learning rate decreases.
+* The estimate becomes increasingly stable.
+* The algorithm becomes less responsive to new information.
+
+---
+
+## Why Are These Methods a Problem?
+
+Both methods rely heavily on the **initial phase of learning**.
+
+However,
+
+> **The beginning of time occurs only once.**
+
+Once the initial exploration is over:
+
+* Optimistic values disappear.
+* Sample-average updates become very small.
+* The agent stops adapting quickly.
+
+---
+
+## What Happens in a Nonstationary Environment?
+
+Suppose the environment changes after a long period.
+
+Example:
+
+| Time        | Best Action |
+| ----------- | ----------- |
+| 1–1000      | Action A    |
+| 1001 onward | Action B    |
+
+### Optimistic Initial Values
+
+* Optimism existed only at the start.
+* No new incentive to explore Action B.
+* The agent may continue choosing Action A.
+
+### Sample-Average Method
+
+Since
+
+$$
+\alpha_n = \frac{1}{n},
+$$
+
+the learning rate becomes extremely small after many updates.
+
+For example,
+
+$$
+n = 1000
+\quad\Rightarrow\quad
+\alpha = 0.001.
+$$
+
+New rewards have very little influence, making adaptation to the changed environment very slow.
+
+---
+
+## Better Approach for Nonstationary Problems
+
+For changing environments, a **constant step-size** is preferred:
+
+$$
+Q_{n+1} = Q_n + \alpha(R_n - Q_n),
+$$
+
+where
+
+$$
+\alpha = 0.1 \quad \text{(or another constant)}.
+$$
+
+This gives more weight to recent rewards, allowing the agent to adapt when the environment changes.
+
+---
+
+## Key Takeaways
+
+* Optimistic Initial Values encourage exploration **only at the start**.
+* Sample-Average methods also give special importance to the beginning of learning.
+* Neither method automatically renews exploration when the environment changes.
+* In **nonstationary environments**, constant learning rates are preferred because they continually adapt to recent observations.
+* Most practical reinforcement learning algorithms therefore use **constant or adaptive step sizes** instead of the sample-average method.
+
+
+
+
+
 
 
