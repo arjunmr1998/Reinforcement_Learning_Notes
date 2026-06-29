@@ -932,6 +932,241 @@ This gives more weight to recent rewards, allowing the agent to adapt when the e
 * In **nonstationary environments**, constant learning rates are preferred because they continually adapt to recent observations.
 * Most practical reinforcement learning algorithms therefore use **constant or adaptive step sizes** instead of the sample-average method.
 
+# Upper Confidence Bound (UCB) Action Selection
+
+## Motivation
+
+The **ε-greedy** algorithm explores by choosing a random action with probability ε.
+
+Problem:
+
+* Every non-greedy action is treated equally.
+* Good actions and bad actions have the same exploration probability.
+* Exploration is inefficient.
+
+Instead, exploration should focus on actions that are **uncertain** and **may actually be optimal**.
+
+---
+
+# UCB Action Selection
+
+The UCB action-selection rule is
+
+$$
+A_t
+===
+
+\arg\max_a
+\left[
+Q_t(a)
++
+c
+\sqrt{\frac{\ln t}{N_t(a)}}
+\right]
+$$
+
+where
+
+* $Q_t(a)$ = estimated reward of action $a$
+* $N_t(a)$ = number of times action $a$ has been selected
+* $t$ = current time step
+* $c>0$ = exploration parameter
+
+If
+
+$$
+N_t(a)=0,
+$$
+
+then action $a$ is selected immediately because it has never been explored.
+
+---
+
+# Components of the Equation
+
+## Exploitation Term
+
+$$
+Q_t(a)
+$$
+
+Represents the current estimate of the action value.
+
+Higher estimated reward makes an action more attractive.
+
+---
+
+## Exploration Bonus
+
+$$
+c
+\sqrt{\frac{\ln t}{N_t(a)}}
+$$
+
+Measures the uncertainty of an action.
+
+* Large bonus → highly uncertain action
+* Small bonus → well-explored action
+
+---
+
+# Role of Each Variable
+
+## Number of Selections
+
+$$
+N_t(a)
+$$
+
+Appears in the denominator.
+
+* Large $N_t(a)$ → smaller exploration bonus.
+* Small $N_t(a)$ → larger exploration bonus.
+
+Thus, frequently selected actions become less attractive for exploration.
+
+---
+
+## Current Time
+
+$$
+\ln t
+$$
+
+Appears in the numerator.
+
+As time increases,
+
+* exploration bonus increases slowly,
+* preventing actions from being ignored forever.
+
+The logarithm grows very slowly, so exploration naturally decreases over time.
+
+---
+
+## Exploration Constant
+
+$$
+c>0
+$$
+
+Controls the balance between exploration and exploitation.
+
+* Small $c$ → mostly greedy behavior.
+* Large $c$ → more exploration.
+
+---
+
+# Example
+
+Suppose
+
+$$
+t=100,
+\qquad
+c=2.
+$$
+
+| Action | $Q_t(a)$ | $N_t(a)$ |
+| ------ | -------- | -------- |
+| A      | 9        | 100      |
+| B      | 8        | 10       |
+| C      | 7        | 2        |
+
+The UCB scores are
+
+| Action | UCB Score |
+| ------ | --------- |
+| A      | 9.43      |
+| B      | 9.36      |
+| C      | 10.04     |
+
+Although Action C has the lowest estimated reward, it is selected because its uncertainty is much larger.
+
+---
+
+# Why UCB Works
+
+Whenever an action is selected:
+
+* $N_t(a)$ increases.
+* The exploration bonus decreases.
+* The algorithm becomes more confident about that action.
+
+Whenever other actions are selected:
+
+* $t$ increases.
+* $N_t(a)$ remains unchanged.
+* The exploration bonus slowly increases.
+
+Therefore, every action is explored eventually, but poor actions are explored less frequently over time.
+
+---
+
+# UCB vs ε-Greedy
+
+| ε-Greedy                              | UCB                                    |
+| ------------------------------------- | -------------------------------------- |
+| Random exploration                    | Directed exploration                   |
+| All non-greedy actions equally likely | Uncertain actions preferred            |
+| Can waste exploration on poor actions | Focuses on potentially optimal actions |
+| Simple                                | More efficient in stationary bandits   |
+
+---
+
+# Limitations of UCB
+
+## Nonstationary Environments
+
+As
+
+$$
+N_t(a)
+$$
+
+keeps increasing,
+
+the exploration bonus approaches zero.
+
+The algorithm becomes less responsive to changing reward distributions.
+
+---
+
+## Large State Spaces
+
+In reinforcement learning,
+
+every state has different actions.
+
+Maintaining
+
+$$
+N_t(s,a)
+$$
+
+for every state-action pair becomes computationally expensive.
+
+---
+
+## Function Approximation
+
+When using neural networks,
+
+there is no explicit count for every action.
+
+Therefore, the standard UCB formula cannot be applied directly.
+
+---
+
+# Key Takeaways
+
+* UCB balances **exploitation** and **exploration** using an exploration bonus.
+* The bonus decreases as an action is explored more often.
+* The logarithmic term ensures every action is eventually revisited.
+* UCB explores intelligently instead of randomly.
+* It performs very well for **stationary multi-armed bandit problems**, but is less practical for large-scale or deep reinforcement learning.
+
+
 
 
 
