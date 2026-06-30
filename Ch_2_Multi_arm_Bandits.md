@@ -1166,10 +1166,988 @@ Therefore, the standard UCB formula cannot be applied directly.
 * UCB explores intelligently instead of randomly.
 * It performs very well for **stationary multi-armed bandit problems**, but is less practical for large-scale or deep reinforcement learning.
 
+# Action Preferences and Softmax Policy
+
+## Key Idea
+
+Instead of estimating the value of each action (`Q(a)`), we learn a **preference** for each action.
+
+The preference is denoted by:
+
+\[
+H(a)
+\]
+
+Unlike action values, preferences **do not estimate expected rewards**.
+
+They only determine **how likely an action is to be selected**.
+
+---
+
+## Action Values vs Preferences
+
+| Action Values | Action Preferences |
+|---------------|--------------------|
+| Estimate expected reward | Represent relative desirability |
+| Used in Q-learning | Used in policy gradient methods |
+| Numerical meaning | No absolute meaning |
+| Greedy action selection | Probabilistic action selection |
+
+---
+
+## Softmax Policy
+
+Action probabilities are computed using the Softmax function:
+
+\[
+\pi(a)=\frac{e^{H(a)}}{\sum_b e^{H(b)}}
+\]
+
+where:
+
+- `H(a)` = preference of action `a`
+- `π(a)` = probability of selecting action `a`
+
+---
+
+## Why Softmax?
+
+Softmax:
+
+- Converts any real numbers into probabilities.
+- Ensures probabilities are positive.
+- Ensures probabilities sum to 1.
+- Assigns higher probabilities to actions with larger preferences.
+
+---
+
+## Example
+
+Preferences:
+
+| Action | H(a) |
+|--------|------|
+| A | 2 |
+| B | 1 |
+| C | 0 |
+
+Exponentials:
+
+| Action | exp(H) |
+|--------|---------|
+| A | 7.39 |
+| B | 2.72 |
+| C | 1.00 |
+
+Total:
+
+7.39 + 2.72 + 1 = 11.11
+
+Probabilities:
+
+| Action | Probability |
+|--------|-------------|
+| A | 0.665 |
+| B | 0.245 |
+| C | 0.090 |
+
+---
+
+## Important Property
+
+Adding the same constant to every preference does **not** change the probabilities.
+
+Example:
+
+Original:
+
+```
+A = 1
+B = 2
+C = 3
+```
+
+Shifted:
+
+```
+A = 1001
+B = 1002
+C = 1003
+```
+
+The resulting probabilities are identical because the common exponential factor cancels out.
+
+---
+
+## Initial Preferences
+
+Usually,
+
+```
+H(a) = 0
+```
+
+for every action.
+
+Softmax gives:
+
+```
+π(a) = 1 / number_of_actions
+```
+
+Every action is equally likely initially.
+
+---
+
+## Softmax vs ε-Greedy
+
+### ε-Greedy
+
+- Best action selected most of the time.
+- Remaining actions are selected uniformly at random.
+
+### Softmax
+
+- Every action has a probability based on its preference.
+- Better actions are chosen more often.
+- Exploration is guided rather than uniform.
+
+---
+
+## Why This Matters
+
+Action preferences form the basis of **policy-based reinforcement learning**.
+
+Instead of learning:
+
+```
+Q(s,a)
+```
+
+we learn:
+
+```
+π(a|s)
+```
+
+This idea is the foundation of modern Deep RL algorithms such as:
+
+- REINFORCE
+- Actor-Critic
+- PPO
+- A2C
+- A3C
+- Soft Actor-Critic (SAC)
+
+---
+
+## Key Takeaways
+
+- Learn **preferences**, not action values.
+- Preferences have **no reward interpretation**.
+- Convert preferences to probabilities using **Softmax**.
+- Only **relative differences** in preferences matter.
+- Softmax naturally balances exploration and exploitation.
+- This is the first step toward **policy gradient methods**.
+
+# Gradient Bandit Algorithm as Stochastic Gradient Ascent
+
+---
+
+# Big Picture
+
+The Gradient Bandit Algorithm was previously introduced with the update rules:
+
+For the **selected action**:
+
+\[
+H_{t+1}(a)=H_t(a)+\alpha(R_t-\bar{R}_t)(1-\pi_t(a))
+\]
+
+For **all other actions**:
+
+\[
+H_{t+1}(a)=H_t(a)-\alpha(R_t-\bar{R}_t)\pi_t(a)
+\]
+
+A natural question arises:
+
+> **Why do these update rules work?**
+
+Are they simply heuristics?
+
+**No.**
+
+Sutton proves that these updates are actually performing **Stochastic Gradient Ascent** on the expected reward.
+
+---
+
+# Goal of the Algorithm
+
+The objective is to maximize the expected reward:
+
+\[
+J(H)=E[R_t]
+\]
+
+where:
+
+- \(H\) = action preferences
+- \(J(H)\) = performance objective
+
+Relationship:
+
+```text
+Action Preferences H
+          ↓
+      Softmax Policy π
+          ↓
+     Selected Action
+          ↓
+         Reward
+```
+
+Changing the preferences changes the policy, which changes the expected reward.
+
+---
+
+# What is Gradient Ascent?
+
+Gradient ascent is an optimization technique used to maximize a function.
+
+General update rule:
+
+\[
+x_{new}=x+\alpha\nabla f(x)
+\]
+
+where:
+
+- \(f(x)\) = objective function
+- \(\nabla f(x)\) = gradient
+- \(\alpha\) = learning rate
+
+The gradient always points toward the direction of maximum increase.
+
+---
+
+# Applying Gradient Ascent to Reinforcement Learning
+
+Our objective is:
+
+\[
+J(H)=E[R_t]
+\]
+
+Therefore the ideal update becomes
+
+\[
+H_{t+1}(a)
+=
+H_t(a)
++
+\alpha
+\frac{\partial E[R_t]}
+{\partial H_t(a)}
+\]
+
+This is Equation (2.13) in Sutton.
+
+---
+
+# The Challenge
+
+To compute
+
+\[
+\frac{\partial E[R]}{\partial H}
+\]
+
+we require the true action values
+
+\[
+q^*(a)
+\]
+
+However,
+
+\(q^*(a)\) is **unknown**.
+
+If we already knew the true action values, there would be nothing left to learn.
+
+---
+
+# Stochastic Gradient Ascent
+
+Instead of computing the exact gradient,
+
+we estimate it from samples.
+
+Instead of
+
+```text
+Exact Gradient
+```
+
+we use
+
+```text
+Sample Gradient
+```
+
+This is exactly the same principle used when training neural networks with mini-batches.
+
+---
+
+# Step 1: Expected Reward
+
+Expected reward is
+
+\[
+E[R]
+=
+\sum_x
+\pi(x)q^*(x)
+\]
+
+where
+
+- \(\pi(x)\) = probability of selecting action \(x\)
+- \(q^*(x)\) = true expected reward of action \(x\)
+
+This is simply the definition of expectation.
+
+Example
+
+| Action | Probability | Reward |
+|---------|------------|--------|
+| A | 0.5 | 10 |
+| B | 0.3 | 5 |
+| C | 0.2 | 1 |
+
+Expected reward
+
+\[
+0.5(10)+0.3(5)+0.2(1)=6.7
+\]
+
+---
+
+# Step 2: Differentiate the Objective
+
+Take the derivative with respect to the action preference.
+
+\[
+\frac{\partial E[R]}
+{\partial H(a)}
+=
+\sum_x
+q^*(x)
+\frac{\partial\pi(x)}
+{\partial H(a)}
+\]
+
+Only the policy depends on the preferences.
+
+The true rewards remain constant.
+
+This is simply an application of the chain rule.
+
+---
+
+# Step 3: Introducing the Baseline
+
+Sutton replaces
+
+\[
+q^*(x)
+\]
+
+with
+
+\[
+q^*(x)-B
+\]
+
+where \(B\) is called the **baseline**.
+
+Why is this allowed?
+
+Because
+
+\[
+\sum_x
+\frac{\partial\pi(x)}
+{\partial H(a)}
+=
+0
+\]
+
+The probabilities always sum to one.
+
+If one probability increases,
+
+another must decrease.
+
+Therefore
+
+adding or subtracting a constant does not change the gradient.
+
+---
+
+# Why Use a Baseline?
+
+Suppose the rewards are
+
+```text
+1001
+1003
+998
+1002
+```
+
+Instead of learning from
+
+```text
+1003
+```
+
+we learn from
+
+```text
+1003 - 1001 = 2
+```
+
+or
+
+```text
+998 - 1001 = -3
+```
+
+The algorithm now answers the question:
+
+> "Was this reward better or worse than average?"
+
+instead of using the raw reward.
+
+Benefits:
+
+- Lower variance
+- More stable learning
+- Faster convergence
+
+---
+
+# Step 4: Multiplying by π/π
+
+Sutton multiplies by
+
+\[
+\frac{\pi(x)}{\pi(x)}
+\]
+
+This equals one, so nothing changes mathematically.
+
+The reason is to rewrite the expression as an expectation.
+
+Recall
+
+\[
+\sum_x
+\pi(x)f(x)
+=
+E[f(x)]
+\]
+
+Now the gradient becomes an expectation,
+
+which can be estimated from samples.
+
+This is the key mathematical trick.
+
+---
+
+# Step 5: Replace q*(A) with Actual Reward
+
+Sutton replaces
+
+\[
+q^*(A)
+\]
+
+with
+
+\[
+R_t
+\]
+
+Why?
+
+Because
+
+\[
+E[R_t|A]
+=
+q^*(A)
+\]
+
+The actual reward is simply a noisy sample of the true expected reward.
+
+Example
+
+True reward
+
+```text
+10
+```
+
+Observed rewards
+
+```text
+9
+11
+10
+12
+8
+```
+
+Average
+
+```text
+10
+```
+
+Thus,
+
+one reward sample is an unbiased estimate of the true value.
+
+---
+
+# Step 6: Derivative of Softmax
+
+Sutton proves
+
+\[
+\frac{\partial\pi(x)}
+{\partial H(a)}
+=
+\pi(x)
+(\mathbf{1}_{a=x}-\pi(a))
+\]
+
+where
+
+\[
+\mathbf{1}_{a=x}
+=
+\begin{cases}
+1,&a=x\\
+0,&a\neq x
+\end{cases}
+\]
+
+This is simply the derivative of the Softmax function.
+
+Interpretation:
+
+If the action is selected,
+
+\[
+1-\pi(a)
+\]
+
+is positive,
+
+so its preference increases.
+
+For every other action,
+
+\[
+-\pi(a)
+\]
+
+is negative,
+
+so their preferences decrease.
+
+---
+
+# Final Update Rule
+
+Substituting everything together gives the Gradient Bandit update.
+
+### Selected Action
+
+\[
+H(a)
+\leftarrow
+H(a)
++
+\alpha
+(R-\bar R)
+(1-\pi(a))
+\]
+
+---
+
+### Non-selected Actions
+
+\[
+H(a)
+\leftarrow
+H(a)
+-
+\alpha
+(R-\bar R)
+\pi(a)
+\]
+
+These are exactly the update rules introduced earlier.
+
+---
+
+# Why This Proof Matters
+
+This proof shows that the Gradient Bandit Algorithm is **not** an arbitrary heuristic.
+
+Instead,
+
+- We define an objective function \(J(H)=E[R]\).
+- We compute its gradient.
+- Since the exact gradient cannot be computed (because \(q^*\) is unknown),
+  we estimate it using sampled rewards.
+- The expected update equals the true gradient.
+
+Therefore,
+
+the algorithm performs **Stochastic Gradient Ascent**.
+
+---
+
+# Role of the Baseline
+
+The baseline
+
+\[
+B=\bar R
+\]
+
+does **not** change the expected gradient.
+
+It only changes the variance.
+
+A good baseline:
+
+- reduces variance,
+- stabilizes learning,
+- improves convergence speed.
+
+Any constant independent of the selected action could be used.
+
+Examples:
+
+- 0
+- 1000
+- Running average reward (most common)
+
+The running average reward is simple and works well in practice.
+
+---
+
+# Key Takeaways
+
+- The objective is to maximize the expected reward.
+- Action preferences are optimized using Gradient Ascent.
+- The exact gradient is unavailable because \(q^*(a)\) is unknown.
+- Sampled rewards provide an unbiased estimate of the true gradient.
+- The Softmax derivative determines how preferences are updated.
+- The baseline reduces variance but does not change the expected update.
+- The Gradient Bandit Algorithm is an example of **Stochastic Gradient Ascent**.
+
+---
+
+# Connection to Deep Reinforcement Learning
+
+This derivation is the foundation of modern policy optimization methods.
+
+The same idea appears in:
+
+- REINFORCE
+- Actor-Critic
+- A2C
+- A3C
+- PPO
+- TRPO
+- Soft Actor-Critic (SAC)
+
+General workflow:
+
+```text
+Define Objective J(θ)
+
+        ↓
+
+Compute Gradient
+
+        ↓
+
+Estimate Gradient Using Samples
+
+        ↓
+
+Update Parameters
+
+        ↓
+
+Improve Policy
+```
+
+Almost every modern policy gradient algorithm follows this same principle.
 
 
+# From Multi-Armed Bandits to Contextual Bandits and Reinforcement Learning
 
+---
 
+# Overview
+
+This section explains the transition from **non-associative bandit problems** to **associative search tasks (Contextual Bandits)**, which serve as a bridge to full Reinforcement Learning.
+
+---
+
+# 1. Non-Associative Task (Multi-Armed Bandit)
+
+In a standard k-armed bandit problem:
+
+- There is only one situation.
+- The learner repeatedly chooses among k actions.
+- The objective is to find the action with the highest expected reward.
+
+```
+One Situation
+      ↓
+ Choose Action
+      ↓
+ Receive Reward
+```
+
+The environment never changes.
+
+Example:
+
+| Action | Reward |
+|--------|--------|
+| Arm 1 | ? |
+| Arm 2 | ? |
+| Arm 3 | ? |
+
+The learner only needs to discover the best arm.
+
+---
+
+# 2. Why This is Limited
+
+In real-world problems, the best action often depends on the current situation.
+
+Example:
+
+| Weather | Best Drink |
+|----------|------------|
+| Summer | Juice |
+| Winter | Tea |
+| Rain | Coffee |
+
+The optimal action changes with the context.
+
+---
+
+# 3. Associative Search Task
+
+Now multiple situations exist.
+
+The learner must associate each situation with its best action.
+
+```
+Situation
+     ↓
+Choose Action
+     ↓
+Receive Reward
+```
+
+Instead of learning a single best action, the learner learns a **policy**.
+
+---
+
+# 4. Policy
+
+A policy maps situations to actions.
+
+Mathematically:
+
+\[
+\pi(s)=a
+\]
+
+where
+
+- \(s\) = state (context)
+- \(a\) = action
+
+Example:
+
+| Context | Best Action |
+|----------|-------------|
+| Red | Arm 1 |
+| Green | Arm 2 |
+| Blue | Arm 3 |
+
+---
+
+# 5. Sutton's Slot Machine Example
+
+Suppose the slot machine changes its display color.
+
+| Display Color | Best Arm |
+|---------------|----------|
+| Red | Arm 1 |
+| Green | Arm 2 |
+| Blue | Arm 5 |
+
+If the learner ignores the color, rewards appear to change randomly and the problem looks highly non-stationary.
+
+If the learner observes the color, it can learn a separate policy for each context.
+
+---
+
+# 6. Contextual Bandits
+
+A contextual bandit follows this sequence:
+
+```
+Observe Context
+        ↓
+Choose Action
+        ↓
+Receive Reward
+        ↓
+Episode Ends
+```
+
+Characteristics:
+
+- Multiple contexts.
+- Immediate reward only.
+- Actions do **not** affect future contexts.
+- Each decision is independent.
+
+Modern examples:
+
+- News recommendation
+- Advertisement selection
+- Product recommendation
+- Email subject line optimization
+
+---
+
+# 7. Full Reinforcement Learning
+
+Full RL introduces **state transitions**.
+
+```
+State
+   ↓
+Action
+   ↓
+Reward
+   ↓
+Next State
+   ↓
+Action
+   ↓
+Reward
+```
+
+Here:
+
+- Actions influence the next state.
+- Future rewards depend on current decisions.
+- Long-term planning becomes essential.
+
+This framework is modeled using a **Markov Decision Process (MDP)**.
+
+---
+
+# Comparison
+
+| Property | Multi-Armed Bandit | Contextual Bandit | Reinforcement Learning |
+|-----------|--------------------|-------------------|-------------------------|
+| Number of states | 1 | Many | Many |
+| Learn policy | No | Yes | Yes |
+| Immediate reward | Yes | Yes | Yes |
+| State transitions | No | No | Yes |
+| Action changes future | No | No | Yes |
+| Long-term planning | No | No | Yes |
+
+---
+
+# Autonomous Driving Example
+
+### Multi-Armed Bandit
+
+Choose one controller.
+
+↓
+
+Receive reward.
+
+---
+
+### Contextual Bandit
+
+State:
+
+```
+Highway
+```
+
+↓
+
+Choose lane.
+
+↓
+
+Receive reward.
+
+Decision ends.
+
+---
+
+### Reinforcement Learning
+
+```
+Highway
+    ↓
+Accelerate
+    ↓
+Merge
+    ↓
+Change Lane
+    ↓
+Exit
+```
+
+Each action changes the future state.
+
+---
+
+# Key Takeaways
+
+- **Multi-Armed Bandit:** Learn one best action.
+- **Contextual Bandit:** Learn the best action for each context.
+- **Reinforcement Learning:** Learn the best sequence of actions because actions influence future states.
+- A **policy** maps states to actions.
+- Contextual Bandits are the bridge between Bandits and full Reinforcement Learning.
 
 
 
